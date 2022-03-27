@@ -17,7 +17,7 @@ from datetime import timezone
 from json.decoder import JSONDecodeError
 from pathlib import Path
 from time import sleep
-from typing import Any
+from typing import Any, Callable
 from typing import Optional
 
 import aiofiles
@@ -1052,6 +1052,7 @@ class OneDrive:
         max_connections: int = 8,
         dest_dir: str | Path | None = None,
         verbose: bool = False,
+        callback: Callable = None,
     ) -> str:
         """Downloads a file to the current working directory asynchronously.
         Note folders cannot be downloaded, you need to use a loop instead.
@@ -1114,7 +1115,7 @@ class OneDrive:
         # Download the file asynchronously
         asyncio.run(
             self._download_async(
-                download_url, file_path, size, max_connections, verbose
+                download_url, file_path, size, max_connections, verbose, callback
             )
         )
         # Return the file name
@@ -1127,6 +1128,7 @@ class OneDrive:
         file_size: int,
         max_connections: int = 8,
         verbose: bool = False,
+        callback: Callable = None,
     ) -> None:
         """INTERNAL: Creates a list of co-routines each downloading one part of the file, and starts them.
         Positional arguments:
@@ -1189,6 +1191,7 @@ class OneDrive:
                         )
                     )
                 )
+                callback(i,num_coroutines)
             # This awaits all the tasks in the `task` list to return
             await asyncio.gather(*tasks)
             # Closing the httpx.AsyncClient instance
@@ -1255,6 +1258,7 @@ class OneDrive:
         parent_folder_id: str | None = None,
         if_exists: str = "rename",
         verbose: bool = False,
+        callback: Callable = None
     ) -> str:
         """Uploads a file to a particular folder with a provided file name.
         Positional arguments:
@@ -1403,6 +1407,8 @@ class OneDrive:
                     # Calculate next chunk range
                     content_range_start = data.tell()
                     content_range_end = data.tell() + chunk_size - 1
+                    if(callback is not None):
+                        callback(n, no_of_uploads)
                 else:
                     # Final chunk upload
                     content_range_end = file_size - 1
@@ -1415,6 +1421,8 @@ class OneDrive:
                         headers=headers,
                         content=content,
                     )
+                    if(callback is not None):
+                        callback(n, no_of_uploads)
         except KeyboardInterrupt:
             httpx.delete(upload_url)
             if verbose:
