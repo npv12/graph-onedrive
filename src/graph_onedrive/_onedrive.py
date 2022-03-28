@@ -1191,7 +1191,7 @@ class OneDrive:
                         )
                     )
                 )
-                await callback(i,num_coroutines)
+                await callback(i,num_coroutines, file_size)
             # This awaits all the tasks in the `task` list to return
             await asyncio.gather(*tasks)
             # Closing the httpx.AsyncClient instance
@@ -1408,7 +1408,7 @@ class OneDrive:
                     content_range_start = data.tell()
                     content_range_end = data.tell() + chunk_size - 1
                     if(callback is not None):
-                        await callback(n, no_of_uploads)
+                        await callback(n, no_of_uploads, file_size)
                 else:
                     # Final chunk upload
                     content_range_end = file_size - 1
@@ -1422,7 +1422,7 @@ class OneDrive:
                         content=content,
                     )
                     if(callback is not None):
-                        await callback(n, no_of_uploads)
+                        await callback(n, no_of_uploads, file_size)
         except KeyboardInterrupt:
             httpx.delete(upload_url)
             if verbose:
