@@ -1126,6 +1126,7 @@ class OneDrive:
         download_url: str,
         file_path: Path,
         file_size: int,
+        chunk_size: int = 1024 * 1024 * 1,
         max_connections: int = 8,
         verbose: bool = False,
         callback: Callable = None,
@@ -1136,6 +1137,7 @@ class OneDrive:
             file_path (Path) -- path of the final file
             file_size (int) -- size of the file being downloaded
         Keyword arguments:
+            chunk_size (int) -- max size of each chunk of the file to download (default = 1024 * 1024 * 1)
             max_connections (int) -- max concurrent open http requests
             verbose (bool) -- prints status message during the download process (default = False)
         """
@@ -1144,6 +1146,8 @@ class OneDrive:
         assert isinstance(file_path, Path)
         assert isinstance(file_size, int)
         assert isinstance(max_connections, int)
+        assert isinstance(chunk_size, int)
+        assert chunk_size < 1024 * 1024 * 60 # Chunks must be less than 60MB
         tasks = list()
         file_part_names = list()
         # This httpx.AsyncClient instance will be shared among the co-routines, passed as an argument
@@ -1152,9 +1156,9 @@ class OneDrive:
         # Creates a new temp directory via tempfile.TemporaryDirectory()
         with tempfile.TemporaryDirectory() as tmp_dir:
             # Min chunk size, used to calculate the  number of concurrent connections based on file size
-            min_typ_chunk_size = 1 * 1024 * 1024  # 1 MiB
+            chunk_size = 1 * 1024 * 1024  # 1 MiB
             # Effective number of concurrent connections
-            num_coroutines = file_size // (2 * min_typ_chunk_size) + 1
+            num_coroutines = file_size // (2 * chunk_size) + 1
             # Assures the max number of co-routines/concurrent connections is equal to the provided one
             if num_coroutines > max_connections:
                 num_coroutines = max_connections
@@ -1166,7 +1170,7 @@ class OneDrive:
                     f"File {file_path.name} ({pretty_size}mb) will be downloaded in {num_coroutines} segments."
                 )
             logger.debug(
-                f"file_size={file_size}B, min_typ_chunk_size={min_typ_chunk_size}B, num_coroutines={num_coroutines}, typ_chunk_size={typ_chunk_size}"
+                f"file_size={file_size}B, chunk_size={chunk_size}B, num_coroutines={num_coroutines}, typ_chunk_size={typ_chunk_size}"
             )
             for i in range(num_coroutines):
                 # Get the file part Path, placed in the temp directory
@@ -1256,6 +1260,7 @@ class OneDrive:
         file_path: str | Path,
         new_file_name: str | None = None,
         parent_folder_id: str | None = None,
+        chunk_size: int = 1 * 1024 * 1024,
         if_exists: str = "rename",
         verbose: bool = False,
         callback: Callable = None
@@ -1266,6 +1271,7 @@ class OneDrive:
         Keyword arguments:
             new_file_name (str) -- new name of the file as it should appear on OneDrive, with extension (default = None)
             parent_folder_id (str) -- item id of the folder to put the file within, if None then root (default = None)
+            chunk_size (int) -- size of the chunks to upload the file in (default = 1 MiB)
             if_exists (str) -- action to take if the new folder already exists [fail, replace, rename] (default = "rename")
             verbose (bool) -- prints status message during the download process (default = False)
         Returns:
@@ -1291,6 +1297,11 @@ class OneDrive:
         if conflict_behavior not in ("fail", "replace", "rename"):
             raise ValueError(
                 f"if_exists expected 'fail', 'replace', or 'rename', got {if_exists!r}"
+            )
+        # Validate chunk_size
+        if(chunk_size > 1024 * 1024 * 60 or chunk_size % 320 != 0):
+            raise ValueError(
+                f"chunk_size must be a multiple of 320 bytes and less than 60 MiB, got {chunk_size!r}"
             )
         # Clean file path by removing escape slashes and converting to Path object
         # To-do: avoid the pathlib as it is a resource hog
@@ -1345,10 +1356,6 @@ class OneDrive:
         )
         upload_url = response.json()["uploadUrl"]
         logger.debug(f"upload_url={upload_url}")
-        # Determine the upload file chunk size
-        chunk_size: int = (
-            1024 * 320 * 16
-        )  # = 5MiB. Docs: Must be multiple of 320KiB, recommend 5-10MiB, max 60MiB
         no_of_uploads: int = -(-file_size // chunk_size)
         logger.debug(
             f"chunk_size={chunk_size}B, file_size={file_size}, no_of_uploads={no_of_uploads}"
