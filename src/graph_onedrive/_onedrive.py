@@ -1,5 +1,5 @@
-"""Contains the OneDrive object class to interact through the Graph API using the Python package Graph-OneDrive.
-"""
+"""Contains the OneDrive object class to interact through the Graph API using the Python package Graph-OneDrive."""
+
 from __future__ import annotations
 
 import asyncio
@@ -1104,14 +1104,7 @@ class OneDrive:
             logger.warning(f"downloaded file size=0, empty file '{file_name}' created.")
             return file_name
         # Create request url based on input item id to be downloaded
-        request_url = self._api_drive_url + "items/" + item_id + "/content"
-        # Make the Graph API request
-        if verbose:
-            print("Getting the file download url")
-        response = httpx.get(request_url, headers=self._headers)
-        # Validate request response and parse
-        self._raise_unexpected_response(response, 302, "could not get download url")
-        download_url = response.headers["Location"]
+        download_url = self._api_drive_url + "items/" + item_id + "/content"
         logger.debug(f"download_url={download_url}")
         # Download the file asynchronously
         asyncio.run(
@@ -1243,7 +1236,9 @@ class OneDrive:
                 f"starting download segment={part_name} start={start} end={end}"
             )
             # Create an AsyncIterator over our GET request
-            async with client.stream("GET", download_url, headers=headers) as response:
+            async with client.stream(
+                "GET", download_url, headers=headers, follow_redirects=True
+            ) as response:
                 # Iterates over incoming bytes in chunks and saves them to file
                 self._raise_unexpected_response(
                     response, [200, 206], "item not downloaded"

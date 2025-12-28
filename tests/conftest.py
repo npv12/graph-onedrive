@@ -1,4 +1,5 @@
 """Sets-up and tears-down configuration used for testing."""
+
 import json
 import os
 import re
@@ -244,9 +245,9 @@ def side_effect_search(request):
     if next:
         alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"  # = string.ascii_letters + string.digits
         skip_token = "s!" + "".join(secrets.choice(alphabet) for _ in range(10))
-        response_json[
-            "@odata.nextLink"
-        ] = f"https://graph.microsoft.com/v1.0/me/drive/root/search(q='{query}')?$top={top}&$skiptoken={skip_token}"
+        response_json["@odata.nextLink"] = (
+            f"https://graph.microsoft.com/v1.0/me/drive/root/search(q='{query}')?$top={top}&$skiptoken={skip_token}"
+        )
     return httpx.Response(200, json=response_json)
 
 
@@ -487,7 +488,7 @@ def mock_auth_api():
 
 def side_effect_access_token(request):
     # Parse and decode the request content, typed to help mypy
-    body_encoded: List[Tuple[bytes, bytes]] = urllib.parse.parse_qsl(request.content)
+    body_encoded: list[tuple[bytes, bytes]] = urllib.parse.parse_qsl(request.content)
     body = {key.decode(): value.decode() for (key, value) in body_encoded}
     # Check the content is as expected
     grant_type = body["grant_type"]
